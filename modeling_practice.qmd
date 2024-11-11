@@ -380,7 +380,6 @@ bike_best_fit |>
   tidy()
 ```
 
-
 Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE metric on the test set.
 
 ```{r}
@@ -396,10 +395,9 @@ extract_fit_parsnip(
   bike_wfl_3 |>
   last_fit(split = bike_split)
 ) |>
-  tidy()
+  tidy() |>
+  print(n=Inf)
 ```
-
-
 
 ## Fit LASSO Model
 
@@ -407,13 +405,11 @@ extract_fit_parsnip(
 
 ```
 
-
 ## Fit Regression Tree Model
 
 ```{r}
 
 ```
-
 
 ## Fit Bagged Tree Model
 
@@ -421,10 +417,8 @@ extract_fit_parsnip(
 
 ```
 
-
 ## Fit Random Forest Model
 
 ```{r}
 
 ```
-
