@@ -353,8 +353,7 @@ bike_wfl_3 <-
 ```{r}
 bike_cv_fits_3 <-
   bike_wfl_3 |>
-  fit_resamples(bike_10_fold,
-                control = control_resamples(save_pred = TRUE))
+  fit_resamples(bike_10_fold)
 ```
 
 ```{r}
@@ -366,7 +365,10 @@ bike_cv_3_metrics <-
 Consider the training set CV error across recipes to choose a best model.
 
 ```{r}
-rbind(bike_cv_1_metrics, bike_cv_2_metrics, bike_cv_3_metrics)
+rbind(bike_cv_1_metrics, bike_cv_2_metrics, bike_cv_3_metrics) |>
+  filter(.metric == "rmse") |>
+  mutate(model = c("Recipe 1", "Recipe 2", "Recipe 3")) |>
+  select(model, "mean rmse" = mean, n, std_err)
 ```
 
 ```{r}
@@ -402,8 +404,89 @@ extract_fit_parsnip(
 ## Fit LASSO Model
 
 ```{r}
-
+bike_lasso_rec <-
+  recipe(rented_bike_count ~ ., data = bike_train) |>
+  step_date(date, features = "dow") |>
+  step_mutate(weekpart = factor(if_else(date_dow %in% c("Sun", "Sat"), "Weekend", "Weekday"))) |>
+  step_rm(date, date_dow) |>
+  step_normalize(all_numeric(), -all_outcomes()) |>
+  step_poly(all_numeric(), -all_outcomes(), degree = 2, keep_original_cols = T) |>
+  step_rm(ends_with("poly_1")) |>
+  step_dummy(seasons, holiday, weekpart) |>
+  step_interact(~ starts_with("holiday"):starts_with("seasons") +
+                  temperature:starts_with("seasons") +
+                  temperature:rainfall)
 ```
+
+```{r}
+lasso_spec <-
+  linear_reg(penalty = tune(), mixture = 1) |>
+  set_engine("glmnet")
+```
+
+```{r}
+bike_lasso_wfl <-
+  workflow() |>
+  add_recipe(bike_lasso_rec) |>
+  add_model(lasso_spec)
+```
+
+
+```{r}
+bike_lasso_grid <-
+  bike_lasso_wfl |>
+  tune_grid(resamples = bike_10_fold,
+            grid = grid_regular(penalty(range = c(-4, 2)), levels = 500)) 
+```
+
+```{r}
+bike_lasso_grid |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  arrange(mean)
+```
+
+```{r}
+bike_lasso_grid |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  ggplot(aes(penalty, mean, color = .metric)) +
+  geom_line() +
+  scale_x_log10()
+```
+
+```{r}
+lowest_rmse <- 
+  bike_lasso_grid |>
+  select_best(metric = "rmse")
+lowest_rmse
+```
+
+```{r}
+bike_lasso_final <- 
+  bike_lasso_wfl |>
+  finalize_workflow(lowest_rmse) |>
+  fit(bike_train)
+
+tidy(bike_lasso_final)
+```
+
+```{r}
+bike_lasso_wfl |>
+  finalize_workflow(lowest_rmse) |>
+  last_fit(split = bike_split) |>
+  collect_metrics()
+```
+
+```{r}
+bike_lasso_wfl |>
+  finalize_workflow(lowest_rmse) |>
+  fit(bike_train) |>
+  predict(bike_test) |>
+  pull() |>
+  rmse_vec(truth = bike_test$rented_bike_count)
+```
+
 
 ## Fit Regression Tree Model
 
