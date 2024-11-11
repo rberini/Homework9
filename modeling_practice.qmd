@@ -11,6 +11,7 @@ execute:
 
 ```{r}
 library(tidyverse)
+library(shinymodels)
 library(tidymodels)
 library(janitor)
 library(naniar)
@@ -352,7 +353,8 @@ bike_wfl_3 <-
 ```{r}
 bike_cv_fits_3 <-
   bike_wfl_3 |>
-  fit_resamples(bike_10_fold)
+  fit_resamples(bike_10_fold,
+                control = control_resamples(save_pred = TRUE))
 ```
 
 ```{r}
@@ -378,6 +380,7 @@ bike_best_fit |>
   tidy()
 ```
 
+
 Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE metric on the test set.
 
 ```{r}
@@ -395,6 +398,8 @@ extract_fit_parsnip(
 ) |>
   tidy()
 ```
+
+
 
 ## Fit LASSO Model
 
