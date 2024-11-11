@@ -1451,22 +1451,41 @@ solar_radiation                 1.000</code></pre>
 <span id="cb59-2"><a href="#cb59-2" aria-hidden="true" tabindex="-1"></a>  bike_wfl_3 <span class="sc">|&gt;</span></span>
 <span id="cb59-3"><a href="#cb59-3" aria-hidden="true" tabindex="-1"></a>  <span class="fu">last_fit</span>(<span class="at">split =</span> bike_split)</span>
 <span id="cb59-4"><a href="#cb59-4" aria-hidden="true" tabindex="-1"></a>) <span class="sc">|&gt;</span></span>
-<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>()</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
+<span id="cb59-5"><a href="#cb59-5" aria-hidden="true" tabindex="-1"></a>  <span class="fu">tidy</span>() <span class="sc">|&gt;</span></span>
+<span id="cb59-6"><a href="#cb59-6" aria-hidden="true" tabindex="-1"></a>  <span class="fu">print</span>(<span class="at">n=</span><span class="cn">Inf</span>)</span></code><button title="Copy to Clipboard" class="code-copy-button"><i class="bi"></i></button></pre></div>
 <div class="cell-output cell-output-stdout">
 <pre><code># A tibble: 29 × 5
-   term                  estimate std.error statistic  p.value
-   &lt;chr&gt;                    &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;
- 1 (Intercept)             16061.     1620.     9.92  1.41e-19
- 2 rainfall                -1538.      429.    -3.59  4.05e- 4
- 3 snowfall                 -238.      194.    -1.23  2.22e- 1
- 4 temperature             -1177.     4252.    -0.277 7.82e- 1
- 5 humidity                -2556.     1476.    -1.73  8.48e- 2
- 6 wind_speed               -476.      209.    -2.28  2.37e- 2
- 7 visibility               -118.      274.    -0.432 6.66e- 1
- 8 dew_point_temperature    8358.     4922.     1.70  9.08e- 2
- 9 solar_radiation          3473.      378.     9.19  2.25e-17
-10 rainfall_poly_2         10396.     3505.     2.97  3.33e- 3
-# ℹ 19 more rows</code></pre>
+   term                                estimate std.error statistic  p.value
+   &lt;chr&gt;                                  &lt;dbl&gt;     &lt;dbl&gt;     &lt;dbl&gt;    &lt;dbl&gt;
+ 1 (Intercept)                           16061.     1620.    9.92   1.41e-19
+ 2 rainfall                              -1538.      429.   -3.59   4.05e- 4
+ 3 snowfall                               -238.      194.   -1.23   2.22e- 1
+ 4 temperature                           -1177.     4252.   -0.277  7.82e- 1
+ 5 humidity                              -2556.     1476.   -1.73   8.48e- 2
+ 6 wind_speed                             -476.      209.   -2.28   2.37e- 2
+ 7 visibility                             -118.      274.   -0.432  6.66e- 1
+ 8 dew_point_temperature                  8358.     4922.    1.70   9.08e- 2
+ 9 solar_radiation                        3473.      378.    9.19   2.25e-17
+10 rainfall_poly_2                       10396.     3505.    2.97   3.33e- 3
+11 snowfall_poly_2                       -1330.     3018.   -0.441  6.60e- 1
+12 temperature_poly_2                   -13043.    17391.   -0.750  4.54e- 1
+13 humidity_poly_2                       -6400.     6020.   -1.06   2.89e- 1
+14 wind_speed_poly_2                      -805.     3133.   -0.257  7.97e- 1
+15 visibility_poly_2                     -2688.     3107.   -0.865  3.88e- 1
+16 dew_point_temperature_poly_2         -12076.    12346.   -0.978  3.29e- 1
+17 solar_radiation_poly_2                -6827.     3753.   -1.82   7.02e- 2
+18 seasons_Spring                        -5283.     2649.   -1.99   4.73e- 2
+19 seasons_Summer                        15176.     3659.    4.15   4.71e- 5
+20 seasons_Winter                        -8051.     2707.   -2.97   3.24e- 3
+21 holiday_No.Holiday                     5577.     1474.    3.78   1.96e- 4
+22 weekpart_Weekend                      -2422.      381.   -6.35   1.08e- 9
+23 holiday_No.Holiday_x_seasons_Spring     227.     2681.    0.0847 9.33e- 1
+24 holiday_No.Holiday_x_seasons_Summer   -1817.     3218.   -0.565  5.73e- 1
+25 holiday_No.Holiday_x_seasons_Winter   -4175.     1916.   -2.18   3.04e- 2
+26 seasons_Spring_x_temperature           3662.     1087.    3.37   8.83e- 4
+27 seasons_Summer_x_temperature         -14596.     2238.   -6.52   4.26e-10
+28 seasons_Winter_x_temperature          -6544.     2786.   -2.35   1.96e- 2
+29 temperature_x_rainfall                -1198.      504.   -2.38   1.82e- 2</code></pre>
 </div>
 </div>
 </section>
