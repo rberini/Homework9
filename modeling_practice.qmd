@@ -648,16 +648,65 @@ bag_metrics <-
 ## Fit Random Forest Model
 
 ```{r}
+rf_mod <- rand_forest(mtry = tune(),
+                      min_n = 10,
+                      trees = tune()) |>
+  set_engine("ranger") |>
+  set_mode("regression")
+```
 
+```{r}
+bike_rf_wfl <- 
+  workflow() |>
+  add_recipe(bike_rec_1) |>
+  add_model(rf_mod)
+```
+
+```{r}
+set.seed(1017)
+
+rf_fits <-
+  bike_rf_wfl |> 
+  tune_grid(resamples = bike_10_fold, grid = 50)
+```
+
+```{r}
+rf_fits |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  arrange(mean)
+```
+
+```{r}
+rf_best_params <-
+  rf_fits |>
+  select_best(metric = "rmse")
+rf_best_params
+```
+
+```{r}
+bike_rf_final_fit <-
+  bike_rf_wfl |>
+  finalize_workflow(rf_best_params) |>
+  last_fit(split = bike_split)
+
+bike_rf_final_fit |>
+  collect_metrics()
+```
+
+```{r}
+rf_metrics <-
+  bike_rf_final_fit |>
+  collect_metrics()
 ```
 
 
 ## Select the Best Model
 
 ```{r}
-rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics) |>
+rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics, rf_metrics) |>
   filter(.metric == "rmse") |>
-  mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree")) |>
+  mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree", "Random Forest")) |>
   select(model, "mean_rmse" = .estimate)
 ```
 
