@@ -404,21 +404,6 @@ extract_fit_parsnip(
 ## Fit LASSO Model
 
 ```{r}
-bike_lasso_rec <-
-  recipe(rented_bike_count ~ ., data = bike_train) |>
-  step_date(date, features = "dow") |>
-  step_mutate(weekpart = factor(if_else(date_dow %in% c("Sun", "Sat"), "Weekend", "Weekday"))) |>
-  step_rm(date, date_dow) |>
-  step_normalize(all_numeric(), -all_outcomes()) |>
-  step_poly(all_numeric(), -all_outcomes(), degree = 2, keep_original_cols = T) |>
-  step_rm(ends_with("poly_1")) |>
-  step_dummy(seasons, holiday, weekpart) |>
-  step_interact(~ starts_with("holiday"):starts_with("seasons") +
-                  temperature:starts_with("seasons") +
-                  temperature:rainfall)
-```
-
-```{r}
 lasso_spec <-
   linear_reg(penalty = tune(), mixture = 1) |>
   set_engine("glmnet")
@@ -427,12 +412,13 @@ lasso_spec <-
 ```{r}
 bike_lasso_wfl <-
   workflow() |>
-  add_recipe(bike_lasso_rec) |>
+  add_recipe(bike_rec_3) |>
   add_model(lasso_spec)
 ```
 
-
 ```{r}
+set.seed(1017)
+
 bike_lasso_grid <-
   bike_lasso_wfl |>
   tune_grid(resamples = bike_10_fold,
@@ -452,7 +438,8 @@ bike_lasso_grid |>
   filter(.metric == "rmse") |>
   ggplot(aes(penalty, mean, color = .metric)) +
   geom_line() +
-  scale_x_log10()
+  scale_x_log10() +
+  scale_color_viridis_d()
 ```
 
 ```{r}
@@ -468,7 +455,8 @@ bike_lasso_final <-
   finalize_workflow(lowest_rmse) |>
   fit(bike_train)
 
-tidy(bike_lasso_final)
+tidy(bike_lasso_final) |>
+  print(n=Inf)
 ```
 
 ```{r}
@@ -481,18 +469,93 @@ bike_lasso_wfl |>
 ```{r}
 bike_lasso_wfl |>
   finalize_workflow(lowest_rmse) |>
-  fit(bike_train) |>
-  predict(bike_test) |>
-  pull() |>
-  rmse_vec(truth = bike_test$rented_bike_count)
+  last_fit(split = bike_split) |>
+  extract_fit_parsnip() |>
+  tidy() |>
+  print(n=Inf)
 ```
-
 
 ## Fit Regression Tree Model
 
 ```{r}
-
+tree_mod <- decision_tree(tree_depth = tune(),
+                          min_n = 10,
+                          cost_complexity = tune()) |>
+  set_engine("rpart") |>
+  set_mode("regression")
 ```
+
+```{r}
+bike_tree_wfl <- 
+  workflow() |>
+  add_recipe(bike_rec_1) |>
+  add_model(tree_mod)
+```
+
+```{r}
+set.seed(1017)
+
+bike_tree_wfl |> 
+  tune_grid(resamples = bike_10_fold, grid = 50) |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  arrange(mean)
+```
+
+
+
+```{r}
+set.seed(1017)
+
+tree_fits <-
+  bike_tree_wfl |> 
+  tune_grid(resamples = bike_10_fold, grid = 50)
+```
+
+```{r}
+tree_fits |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  arrange(mean)
+```
+
+```{r}
+tree_fits |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  mutate(tree_depth = factor(tree_depth)) %>%
+  ggplot(aes(cost_complexity, mean, color = tree_depth)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  scale_x_log10(labels = scales::label_number()) +
+  scale_color_viridis_d()
+```
+
+
+```{r}
+tree_best_params <-
+  tree_fits |>
+  select_best(metric = "rmse")
+tree_best_params
+```
+
+```{r}
+bike_tree_final_fit <-
+  bike_tree_wfl |>
+  finalize_workflow(tree_best_params) |>
+  last_fit(split = bike_split)
+
+bike_tree_final_fit |>
+  collect_metrics()
+```
+
+```{r}
+bike_tree_final_fit |>
+  extract_workflow() |>
+  extract_fit_engine() |>
+  rpart.plot::rpart.plot(roundint = F)
+```
+
 
 ## Fit Bagged Tree Model
 
