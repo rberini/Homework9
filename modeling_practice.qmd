@@ -11,8 +11,8 @@ execute:
 
 ```{r}
 library(tidyverse)
-library(shinymodels)
 library(tidymodels)
+library(baguette)
 library(janitor)
 library(naniar)
 library(skimr)
@@ -368,7 +368,7 @@ Consider the training set CV error across recipes to choose a best model.
 rbind(bike_cv_1_metrics, bike_cv_2_metrics, bike_cv_3_metrics) |>
   filter(.metric == "rmse") |>
   mutate(model = c("Recipe 1", "Recipe 2", "Recipe 3")) |>
-  select(model, "mean rmse" = mean, n, std_err)
+  select(model, "mean_rmse" = mean, n, std_err)
 ```
 
 ```{r}
@@ -400,6 +400,14 @@ extract_fit_parsnip(
   tidy() |>
   print(n=Inf)
 ```
+
+```{r}
+mlr_metrics <-
+  bike_wfl_3 |>
+  last_fit(split = bike_split) |>
+  collect_metrics()
+```
+
 
 ## Fit LASSO Model
 
@@ -475,6 +483,14 @@ bike_lasso_wfl |>
   print(n=Inf)
 ```
 
+```{r}
+lasso_metrics <-
+  bike_lasso_wfl |>
+  finalize_workflow(lowest_rmse) |>
+  last_fit(split = bike_split) |>
+  collect_metrics()
+```
+
 ## Fit Regression Tree Model
 
 ```{r}
@@ -491,17 +507,6 @@ bike_tree_wfl <-
   add_recipe(bike_rec_1) |>
   add_model(tree_mod)
 ```
-
-```{r}
-set.seed(1017)
-
-bike_tree_wfl |> 
-  tune_grid(resamples = bike_10_fold, grid = 50) |>
-  collect_metrics() |>
-  filter(.metric == "rmse") |>
-  arrange(mean)
-```
-
 
 
 ```{r}
@@ -556,11 +561,88 @@ bike_tree_final_fit |>
   rpart.plot::rpart.plot(roundint = F)
 ```
 
+```{r}
+tree_metrics <-
+  bike_tree_final_fit |>
+  collect_metrics()
+```
+
 
 ## Fit Bagged Tree Model
 
 ```{r}
+bag_mod <- bag_tree(tree_depth = tune(),
+                          min_n = 10,
+                          cost_complexity = tune()) |>
+  set_engine("rpart") |>
+  set_mode("regression") |>
+  translate()
+```
 
+```{r}
+bike_bag_wfl <- 
+  workflow() |>
+  add_recipe(bike_rec_1) |>
+  add_model(bag_mod)
+```
+
+```{r}
+set.seed(1017)
+
+bag_fits <-
+  bike_bag_wfl |> 
+  tune_grid(resamples = bike_10_fold, grid = 50)
+```
+
+```{r}
+bag_fits |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  arrange(mean)
+```
+
+```{r}
+bag_fits |>
+  collect_metrics() |>
+  filter(.metric == "rmse") |>
+  mutate(tree_depth = factor(tree_depth)) %>%
+  ggplot(aes(cost_complexity, mean, color = tree_depth)) +
+  geom_line(size = 1.5, alpha = 0.6) +
+  geom_point(size = 2) +
+  scale_x_log10(labels = scales::label_number()) +
+  scale_color_viridis_d()
+```
+
+```{r}
+bag_best_params <-
+  bag_fits |>
+  select_best(metric = "rmse")
+bag_best_params
+```
+
+```{r}
+bike_bag_final_fit <-
+  bike_bag_wfl |>
+  finalize_workflow(bag_best_params) |>
+  last_fit(split = bike_split)
+
+bike_bag_final_fit |>
+  collect_metrics()
+```
+
+```{r}
+bike_bag_final_model <- extract_fit_engine(bike_bag_final_fit) 
+bike_bag_final_model$imp |>
+ mutate(term = factor(term, levels = term)) |>
+ ggplot(aes(x = term, y = value)) + 
+ geom_bar(stat ="identity") +
+ coord_flip()
+```
+
+```{r}
+bag_metrics <-
+  bike_bag_final_fit |>
+  collect_metrics()
 ```
 
 ## Fit Random Forest Model
@@ -568,3 +650,14 @@ bike_tree_final_fit |>
 ```{r}
 
 ```
+
+
+## Select the Best Model
+
+```{r}
+rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics) |>
+  filter(.metric == "rmse") |>
+  mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree")) |>
+  select(model, "mean_rmse" = .estimate)
+```
+
