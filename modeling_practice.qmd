@@ -17,6 +17,7 @@ library(janitor)
 library(naniar)
 library(skimr)
 library(pastecs)
+library(vip)
 options(scipen = 999, digits = 2)
 tidymodels_prefer()
 ```
@@ -408,7 +409,6 @@ mlr_metrics <-
   collect_metrics()
 ```
 
-
 ## Fit LASSO Model
 
 ```{r}
@@ -508,7 +508,6 @@ bike_tree_wfl <-
   add_model(tree_mod)
 ```
 
-
 ```{r}
 set.seed(1017)
 
@@ -535,7 +534,6 @@ tree_fits |>
   scale_x_log10(labels = scales::label_number()) +
   scale_color_viridis_d()
 ```
-
 
 ```{r}
 tree_best_params <-
@@ -566,7 +564,6 @@ tree_metrics <-
   bike_tree_final_fit |>
   collect_metrics()
 ```
-
 
 ## Fit Bagged Tree Model
 
@@ -630,13 +627,16 @@ bike_bag_final_fit |>
   collect_metrics()
 ```
 
+
 ```{r}
 bike_bag_final_model <- extract_fit_engine(bike_bag_final_fit) 
 bike_bag_final_model$imp |>
- mutate(term = factor(term, levels = term)) |>
- ggplot(aes(x = term, y = value)) + 
- geom_bar(stat ="identity") +
- coord_flip()
+  mutate(term = factor(term, levels = term)) |>
+  ggplot(aes(x = reorder(term, value), y = value)) + 
+  geom_bar(stat ="identity") +
+  coord_flip() +
+  theme(axis.title.y = element_blank()) +
+  ylab("Importance")
 ```
 
 ```{r}
@@ -651,7 +651,7 @@ bag_metrics <-
 rf_mod <- rand_forest(mtry = tune(),
                       min_n = 10,
                       trees = tune()) |>
-  set_engine("ranger") |>
+  set_engine("ranger", importance = "impurity") |>
   set_mode("regression")
 ```
 
@@ -695,11 +695,17 @@ bike_rf_final_fit |>
 ```
 
 ```{r}
+bike_rf_final_model <- extract_fit_engine(bike_rf_final_fit) 
+bike_rf_final_model |>
+  vip(num_features = 20)
+```
+
+
+```{r}
 rf_metrics <-
   bike_rf_final_fit |>
   collect_metrics()
 ```
-
 
 ## Select the Best Model
 
@@ -709,4 +715,3 @@ rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics, rf_metrics) |>
   mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree", "Random Forest")) |>
   select(model, "mean_rmse" = .estimate)
 ```
-
