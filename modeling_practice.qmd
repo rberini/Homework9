@@ -290,6 +290,13 @@ bike_rec_3 |>
   bake(bike_train)
 ```
 
+Define metrics set.
+
+```{r}
+metrics_set <- metric_set(rmse, mae)
+```
+
+
 ## Fit MLR Models
 
 Set up linear model fit to use the `“lm”` engine.
@@ -312,7 +319,7 @@ bike_wfl_1 <-
 ```{r}
 bike_cv_fits_1 <-
   bike_wfl_1 |>
-  fit_resamples(bike_10_fold)
+  fit_resamples(bike_10_fold, metrics = metrics_set)
 ```
 
 ```{r}
@@ -333,7 +340,7 @@ bike_wfl_2 <-
 ```{r}
 bike_cv_fits_2 <-
   bike_wfl_2 |>
-  fit_resamples(bike_10_fold)
+  fit_resamples(bike_10_fold, metrics = metrics_set)
 ```
 
 ```{r}
@@ -354,7 +361,7 @@ bike_wfl_3 <-
 ```{r}
 bike_cv_fits_3 <-
   bike_wfl_3 |>
-  fit_resamples(bike_10_fold)
+  fit_resamples(bike_10_fold, metrics = metrics_set)
 ```
 
 ```{r}
@@ -383,11 +390,11 @@ bike_best_fit |>
   tidy()
 ```
 
-Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE metric on the test set.
+Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE and MAE metrics on the test set.
 
 ```{r}
 bike_wfl_3 |>
-  last_fit(split = bike_split) |>
+  last_fit(split = bike_split, metrics = metrics_set) |>
   collect_metrics()
 ```
 
@@ -402,20 +409,27 @@ extract_fit_parsnip(
   print(n=Inf)
 ```
 
+Collect final RMSE and MAE metrics for best MLR model.
+
 ```{r}
 mlr_metrics <-
   bike_wfl_3 |>
-  last_fit(split = bike_split) |>
+  last_fit(split = bike_split, metrics = metrics_set) |>
   collect_metrics()
+mlr_metrics
 ```
 
 ## Fit LASSO Model
+
+Set up LASSO model fit to use the `“glm”` engine.
 
 ```{r}
 lasso_spec <-
   linear_reg(penalty = tune(), mixture = 1) |>
   set_engine("glmnet")
 ```
+
+Create workflow using recipe 3.
 
 ```{r}
 bike_lasso_wfl <-
@@ -424,14 +438,19 @@ bike_lasso_wfl <-
   add_model(lasso_spec)
 ```
 
+Create a tuning grid to consider varying penalties.
+
 ```{r}
 set.seed(1017)
 
 bike_lasso_grid <-
   bike_lasso_wfl |>
   tune_grid(resamples = bike_10_fold,
-            grid = grid_regular(penalty(range = c(-4, 2)), levels = 500)) 
+            grid = grid_regular(penalty(range = c(-4, 2)), levels = 500),
+            metrics = metrics_set) 
 ```
+
+Sort models by tuned penalty parameter with lowest RMSE.
 
 ```{r}
 bike_lasso_grid |>
@@ -439,6 +458,8 @@ bike_lasso_grid |>
   filter(.metric == "rmse") |>
   arrange(mean)
 ```
+
+Show model performance at different levels of the penalty parameter.
 
 ```{r}
 bike_lasso_grid |>
@@ -450,12 +471,15 @@ bike_lasso_grid |>
   scale_color_viridis_d()
 ```
 
+Identify penalty parameter with lowest RMSE.
+
 ```{r}
 lowest_rmse <- 
   bike_lasso_grid |>
   select_best(metric = "rmse")
 lowest_rmse
 ```
+
 
 ```{r}
 bike_lasso_final <- 
@@ -467,31 +491,40 @@ tidy(bike_lasso_final) |>
   print(n=Inf)
 ```
 
-```{r}
-bike_lasso_wfl |>
-  finalize_workflow(lowest_rmse) |>
-  last_fit(split = bike_split) |>
-  collect_metrics()
-```
+Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE and MAE metrics on the test set.
 
 ```{r}
 bike_lasso_wfl |>
   finalize_workflow(lowest_rmse) |>
-  last_fit(split = bike_split) |>
+  last_fit(split = bike_split, metrics = metrics_set) |>
+  collect_metrics()
+```
+
+Obtain the final model (fit on the entire training set) coefficient table using `extract_fit_parsnip()` and `tidy()`.
+
+```{r}
+bike_lasso_wfl |>
+  finalize_workflow(lowest_rmse) |>
+  last_fit(split = bike_split, metrics = metrics_set) |>
   extract_fit_parsnip() |>
   tidy() |>
   print(n=Inf)
 ```
 
+Collect final RMSE and MAE metrics for best LASSO model.
+
 ```{r}
 lasso_metrics <-
   bike_lasso_wfl |>
   finalize_workflow(lowest_rmse) |>
-  last_fit(split = bike_split) |>
+  last_fit(split = bike_split, metrics = metrics_set) |>
   collect_metrics()
+lasso_metrics
 ```
 
 ## Fit Regression Tree Model
+
+Set up Regression Tree fit to use the `“rpart”` engine.
 
 ```{r}
 tree_mod <- decision_tree(tree_depth = tune(),
@@ -501,6 +534,8 @@ tree_mod <- decision_tree(tree_depth = tune(),
   set_mode("regression")
 ```
 
+Create workflow using recipe 1.
+
 ```{r}
 bike_tree_wfl <- 
   workflow() |>
@@ -508,13 +543,18 @@ bike_tree_wfl <-
   add_model(tree_mod)
 ```
 
+Create a tuning grid to consider varying levels of tree depth and cost complexity.
+
 ```{r}
 set.seed(1017)
 
 tree_fits <-
   bike_tree_wfl |> 
-  tune_grid(resamples = bike_10_fold, grid = 50)
+  tune_grid(resamples = bike_10_fold, grid = 50,
+            metrics = metrics_set)
 ```
+
+Sort models by tuned tree depth and cost complexity parameters with lowest RMSE.
 
 ```{r}
 tree_fits |>
@@ -522,6 +562,8 @@ tree_fits |>
   filter(.metric == "rmse") |>
   arrange(mean)
 ```
+
+Show model performance at different levels of tree depth and cost complexity parameters.
 
 ```{r}
 tree_fits |>
@@ -535,6 +577,8 @@ tree_fits |>
   scale_color_viridis_d()
 ```
 
+Identify parameter combination with lowest RMSE.
+
 ```{r}
 tree_best_params <-
   tree_fits |>
@@ -542,15 +586,19 @@ tree_best_params <-
 tree_best_params
 ```
 
+Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE and MAE metrics on the test set.
+
 ```{r}
 bike_tree_final_fit <-
   bike_tree_wfl |>
   finalize_workflow(tree_best_params) |>
-  last_fit(split = bike_split)
+  last_fit(split = bike_split, metrics = metrics_set)
 
 bike_tree_final_fit |>
   collect_metrics()
 ```
+
+Visualize the regression tree.
 
 ```{r}
 bike_tree_final_fit |>
@@ -559,13 +607,18 @@ bike_tree_final_fit |>
   rpart.plot::rpart.plot(roundint = F)
 ```
 
+Collect final RMSE and MAE metrics for best Regression Tree model.
+
 ```{r}
 tree_metrics <-
   bike_tree_final_fit |>
   collect_metrics()
+tree_metrics
 ```
 
 ## Fit Bagged Tree Model
+
+Set up Bagged Tree fit to use the `“rpart”` engine.
 
 ```{r}
 bag_mod <- bag_tree(tree_depth = tune(),
@@ -576,6 +629,8 @@ bag_mod <- bag_tree(tree_depth = tune(),
   translate()
 ```
 
+Create workflow using recipe 1.
+
 ```{r}
 bike_bag_wfl <- 
   workflow() |>
@@ -583,13 +638,18 @@ bike_bag_wfl <-
   add_model(bag_mod)
 ```
 
+Create a tuning grid to consider varying levels of tree depth and cost complexity.
+
 ```{r}
 set.seed(1017)
 
 bag_fits <-
   bike_bag_wfl |> 
-  tune_grid(resamples = bike_10_fold, grid = 50)
+  tune_grid(resamples = bike_10_fold, grid = 50,
+            metrics = metrics_set)
 ```
+
+Sort models by tuned tree depth and cost complexity parameters with lowest RMSE.
 
 ```{r}
 bag_fits |>
@@ -597,6 +657,8 @@ bag_fits |>
   filter(.metric == "rmse") |>
   arrange(mean)
 ```
+
+Show model performance at different levels of tree depth and cost complexity parameters.
 
 ```{r}
 bag_fits |>
@@ -610,6 +672,8 @@ bag_fits |>
   scale_color_viridis_d()
 ```
 
+Identify parameter combination with lowest RMSE.
+
 ```{r}
 bag_best_params <-
   bag_fits |>
@@ -617,16 +681,19 @@ bag_best_params <-
 bag_best_params
 ```
 
+Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE and MAE metrics on the test set.
+
 ```{r}
 bike_bag_final_fit <-
   bike_bag_wfl |>
   finalize_workflow(bag_best_params) |>
-  last_fit(split = bike_split)
+  last_fit(split = bike_split, metrics = metrics_set)
 
 bike_bag_final_fit |>
   collect_metrics()
 ```
 
+Produce a variable importance plot.
 
 ```{r}
 bike_bag_final_model <- extract_fit_engine(bike_bag_final_fit) 
@@ -639,13 +706,18 @@ bike_bag_final_model$imp |>
   ylab("Importance")
 ```
 
+Collect final RMSE and MAE metrics for best Bagged Tree model.
+
 ```{r}
 bag_metrics <-
   bike_bag_final_fit |>
   collect_metrics()
+bag_metrics
 ```
 
 ## Fit Random Forest Model
+
+Set up Random Forest fit to use the `“ranger”` engine.
 
 ```{r}
 rf_mod <- rand_forest(mtry = tune(),
@@ -655,6 +727,8 @@ rf_mod <- rand_forest(mtry = tune(),
   set_mode("regression")
 ```
 
+Create workflow using recipe 1.
+
 ```{r}
 bike_rf_wfl <- 
   workflow() |>
@@ -662,13 +736,18 @@ bike_rf_wfl <-
   add_model(rf_mod)
 ```
 
+Create a tuning grid to consider varying levels of number of predictors that will be randomly sampled at each split and number of trees contained in the ensemble.
+
 ```{r}
 set.seed(1017)
 
 rf_fits <-
   bike_rf_wfl |> 
-  tune_grid(resamples = bike_10_fold, grid = 50)
+  tune_grid(resamples = bike_10_fold, grid = 50,
+            metrics = metrics_set)
 ```
+
+Sort models by tuned parameters with lowest RMSE.
 
 ```{r}
 rf_fits |>
@@ -677,6 +756,8 @@ rf_fits |>
   arrange(mean)
 ```
 
+Identify parameter combination with lowest RMSE.
+
 ```{r}
 rf_best_params <-
   rf_fits |>
@@ -684,15 +765,19 @@ rf_best_params <-
 rf_best_params
 ```
 
+Using the best model, fit the model to the entire training data set using the `last_fit()` function. Compute the RMSE and MAE metrics on the test set.
+
 ```{r}
 bike_rf_final_fit <-
   bike_rf_wfl |>
   finalize_workflow(rf_best_params) |>
-  last_fit(split = bike_split)
+  last_fit(split = bike_split, metrics = metrics_set)
 
 bike_rf_final_fit |>
   collect_metrics()
 ```
+
+Produce a variable importance plot.
 
 ```{r}
 bike_rf_final_model <- extract_fit_engine(bike_rf_final_fit) 
@@ -700,18 +785,51 @@ bike_rf_final_model |>
   vip(num_features = 20)
 ```
 
+Collect final RMSE and MAE metrics for best Random Forest model.
 
 ```{r}
 rf_metrics <-
   bike_rf_final_fit |>
   collect_metrics()
+rf_metrics
 ```
 
 ## Select the Best Model
+
+Compare all final models using both RMSE and MAE
 
 ```{r}
 rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics, rf_metrics) |>
   filter(.metric == "rmse") |>
   mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree", "Random Forest")) |>
   select(model, "mean_rmse" = .estimate)
+```
+
+```{r}
+rbind(mlr_metrics, lasso_metrics, tree_metrics, bag_metrics, rf_metrics) |>
+  filter(.metric == "mae") |>
+  mutate(model = c("MLR", "LASSO", "Tree", "Bagged Tree", "Random Forest")) |>
+  select(model, "mean_mae" = .estimate)
+```
+
+The best performing model is **Bagged Tree**.
+
+For the overall best model, fit it to the entire data set.
+
+```{r}
+set.seed(1017)
+
+final_best_wfl <- 
+  bike_bag_wfl |> 
+  finalize_workflow(bag_best_params)
+```
+
+
+```{r}
+final_metrics <-
+  final_best_wfl |> 
+  last_fit(split = bike_split, metrics = metrics_set) |>
+  collect_metrics()
+
+final_metrics
 ```
